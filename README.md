@@ -1,8 +1,8 @@
 # openvpn-ecc
-Openvpn server installation script using elliptic curve cryptography
-[Derived from https://github.com/Nyr/openvpn-install]
+Openvpn server installation script (derived from https://github.com/Nyr/openvpn-install) using elliptic curve cryptography
 
-By default, it uses elliptic curve sect571k1, you can change that by modifying EasyRSA-v3.0.6/vars and rebuilt the archive easyrsa.tgz
+
+By default, it uses elliptic curve secp521r1, you can change that by modifying EasyRSA-v3.0.6/vars and rebuilt the archive easyrsa.tgz
 
 For most office uses, you do not want to route other traffics via VPN server, such as surfing the web. Thus, a new option (Option 0) is added to avoid redirecting gateway.
 
@@ -11,3 +11,15 @@ Moreover,
 - by default, client-to-client communication is enabled by default, you can disable it by modifying server.conf
 - you can enable server status log by uncommenting "management localhost" in server.conf and specifying a port number
 
+
+# Server Installation
+Git clone the repository, and run openvpn-install.sh inside the directory.
+
+# Client Installation
+For command-line installation, after "apt-get install openvpn", run "openvpn --config client.ovpn"
+
+For GUI installation, install OpenVPN GUI and import profile client.ovpn
+
+# References:
+- Safety of various elliptic curves, http://safecurves.cr.yp.to/
+- Use elliptic curve cryptography or OpenVPN, https://blog.mirabellette.eu/index.php?article35/a-highly-secure-openvpn-2-4-configuration-2018

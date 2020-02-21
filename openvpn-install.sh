@@ -466,6 +466,7 @@ nobind
 persist-key
 persist-tun
 remote-cert-tls server
+auth-nocache
 auth SHA512
 cipher AES-256-GCM
 ignore-unknown-option block-outside-dns
