@@ -343,13 +343,10 @@ client-to-client
 #management localhost 7500
 ifconfig-pool-persist ipp.txt" > /etc/openvpn/server/server.conf
 	if [[ "$dns" =~ ^- ]]; then
-		client_options='pull-filter ignore "redirect-gateway"
-pull-filter ignore "route-gateway"
-pull-filter ignore "dhcp-option"
-'
+		client_options='route-nopull'
 		dns=${dns:1}
 	else
-		client_options=
+		client_options='#route-nopull'
 	fi
 	if [ "$dns" == 0 ]; then
 		echo 'push "#redirect-gateway def1 bypass-dhcp"' >> /etc/openvpn/server/server.conf
