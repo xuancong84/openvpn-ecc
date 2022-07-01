@@ -105,11 +105,11 @@ if [[ -e /etc/openvpn/server/server.conf ]]; then
 			echo
 			echo "Tell me a name for the client certificate."
 			read -p "Client name: " unsanitized_client
-			client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]/_/g' <<< "$unsanitized_client")
+			client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_.-]/_/g' <<< "$unsanitized_client")
 			while [[ -z "$client" || -e /etc/openvpn/server/easy-rsa/pki/issued/"$client".crt ]]; do
 				echo "$client: invalid client name."
 				read -p "Client name: " unsanitized_client
-				client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]/_/g' <<< "$unsanitized_client")
+				client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_.-]/_/g' <<< "$unsanitized_client")
 			done
 			cd /etc/openvpn/server/easy-rsa/
 			EASYRSA_CERT_EXPIRE=$EXPIRY ./easyrsa build-client-full "$client" nopass
@@ -173,14 +173,14 @@ if [[ -e /etc/openvpn/server/server.conf ]]; then
 				port=$(grep '^port ' /etc/openvpn/server/server.conf | cut -d " " -f 2)
 				protocol=$(grep '^proto ' /etc/openvpn/server/server.conf | cut -d " " -f 2)
 				if pgrep firewalld; then
-					ip=$(firewall-cmd --direct --get-rules ipv4 nat POSTROUTING | grep '\-s 10.8.0.0/24 '"'"'!'"'"' -d 10.8.0.0/24 -j SNAT --to ' | cut -d " " -f 10)
+					ip=$(firewall-cmd --direct --get-rules ipv4 nat POSTROUTING | grep "\\-s $vipm '"'!'"' -d $vipm -j SNAT --to " | cut -d " " -f 10)
 					# Using both permanent and not permanent rules to avoid a firewalld reload.
 					firewall-cmd --remove-port="$port"/"$protocol"
-					firewall-cmd --zone=trusted --remove-source=10.8.0.0/24
+					firewall-cmd --zone=trusted --remove-source=$vipm
 					firewall-cmd --permanent --remove-port="$port"/"$protocol"
-					firewall-cmd --permanent --zone=trusted --remove-source=10.8.0.0/24
-					firewall-cmd --direct --remove-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to "$ip"
-					firewall-cmd --permanent --direct --remove-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to "$ip"
+					firewall-cmd --permanent --zone=trusted --remove-source=$vipm
+					firewall-cmd --direct --remove-rule ipv4 nat POSTROUTING 0 -s $vipm ! -d $vipm -j SNAT --to "$ip"
+					firewall-cmd --permanent --direct --remove-rule ipv4 nat POSTROUTING 0 -s $vipm ! -d $vipm -j SNAT --to "$ip"
 				else
 					systemctl disable --now openvpn-iptables.service
 					rm -f /etc/systemd/system/openvpn-iptables.service
@@ -189,13 +189,18 @@ if [[ -e /etc/openvpn/server/server.conf ]]; then
 					semanage port -d -t openvpn_port_t -p "$protocol" "$port"
 				fi
 				systemctl disable --now openvpn-server@server.service
-				rm -rf /etc/openvpn
 				rm -f /etc/systemd/system/openvpn-server@server.service.d/disable-limitnproc.conf
 				rm -f /etc/sysctl.d/30-openvpn-forward.conf
+				set +e
 				if [[ "$os" = "debian" ]]; then
-					apt-get remove --purge -y openvpn
+					apt-get purge openvpn
 				else
-					yum remove openvpn -y
+					yum remove openvpn
+				fi
+				if [ $? == 0 ]; then
+					rm -rf /etc/openvpn
+				else
+					rm -f /etc/openvpn/server/server.conf
 				fi
 				echo
 				echo "OpenVPN removed!"
@@ -233,7 +238,7 @@ else
 	# If $IP is a private IP address, the server must be behind NAT
 	if echo "$ip" | grep -qE '^(10\.|172\.1[6789]\.|172\.2[0-9]\.|172\.3[01]\.|192\.168)'; then
 		echo
-		echo "This server is behind NAT. What is the public IPv4 address or hostname?"
+		echo "This server is behind NAT. What is the public IPv4 address or hostname for client to connect to?"
 		get_public_ip=$(wget -4qO- "http://whatismyip.akamai.com/" || curl -4Ls "http://whatismyip.akamai.com/")
 		read -p "Public IPv4 address / hostname [$get_public_ip]: " public_ip
 		[ -z "$public_ip" ] && public_ip="$get_public_ip"
@@ -256,6 +261,15 @@ else
 		;;
 	esac
 	echo
+	echo "What private network address do you want to set (address must ends with .0 if /24, .0.0 if /16)?"
+	read -p "IP/netmask_len [10.8.0.0/24]: " vipm
+	until [[ -z "$vipm" || "$vipm" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; do
+		echo "$vipm: invalid network address in CIDR form."
+		read -p "IP/netmask_len [10.8.0.0/24]: " vipm
+	done
+	[[ -z "$vipm" ]] && vipm="10.8.0.0/24"
+	vip=`echo $vipm | sed "s:/.*::g"`
+	echo
 	echo "What port do you want OpenVPN listening to?"
 	read -p "Port [1194]: " port
 	until [[ -z "$port" || "$port" =~ ^[0-9]+$ && "$port" -le 65535 ]]; do
@@ -263,6 +277,7 @@ else
 		read -p "Port [1194]: " port
 	done
 	[[ -z "$port" ]] && port="1194"
+
 	echo
 	echo "Which DNS do you want to use with the VPN? (put -ve number to keep the setting in server config but disable in client config)"
 	echo "   0) Do not redirect gateway"
@@ -280,7 +295,7 @@ else
 	echo "Finally, tell me a name for the client certificate."
 	read -p "Client name [client]: " unsanitized_client
 	# Allow a limited set of characters to avoid conflicts
-	client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]/_/g' <<< "$unsanitized_client")
+	client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_.-]/_/g' <<< "$unsanitized_client")
 	[[ -z "$client" ]] && client="client"
 	echo
 	echo "Okay, that was all I needed. We are ready to set up your OpenVPN server now."
@@ -338,7 +353,7 @@ dh dh.pem
 auth SHA512
 tls-crypt tc.key
 topology subnet
-server 10.8.0.0 255.255.255.0
+server $vip 255.255.255.0
 client-to-client
 #management localhost 7500
 ifconfig-pool-persist ipp.txt" > /etc/openvpn/server/server.conf
@@ -412,25 +427,25 @@ crl-verify crl.pem" >> /etc/openvpn/server/server.conf
 		# We don't use --add-service=openvpn because that would only work with
 		# the default port and protocol.
 		firewall-cmd --add-port="$port"/"$protocol"
-		firewall-cmd --zone=trusted --add-source=10.8.0.0/24
+		firewall-cmd --zone=trusted --add-source=$vipm
 		firewall-cmd --permanent --add-port="$port"/"$protocol"
-		firewall-cmd --permanent --zone=trusted --add-source=10.8.0.0/24
+		firewall-cmd --permanent --zone=trusted --add-source=$vipm
 		# Set NAT for the VPN subnet
-		firewall-cmd --direct --add-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to "$ip"
-		firewall-cmd --permanent --direct --add-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to "$ip"
+		firewall-cmd --direct --add-rule ipv4 nat POSTROUTING 0 -s $vipm ! -d $vipm -j SNAT --to "$ip"
+		firewall-cmd --permanent --direct --add-rule ipv4 nat POSTROUTING 0 -s $vipm ! -d $vipm -j SNAT --to "$ip"
 	else
 		# Create a service to set up persistent iptables rules
 		echo "[Unit]
 Before=network.target
 [Service]
 Type=oneshot
-ExecStart=/sbin/iptables -t nat -A POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $ip
+ExecStart=/sbin/iptables -t nat -A POSTROUTING -s $vipm ! -d $vipm -j SNAT --to $ip
 ExecStart=/sbin/iptables -I INPUT -p $protocol --dport $port -j ACCEPT
-ExecStart=/sbin/iptables -I FORWARD -s 10.8.0.0/24 -j ACCEPT
+ExecStart=/sbin/iptables -I FORWARD -s $vipm -j ACCEPT
 ExecStart=/sbin/iptables -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
-ExecStop=/sbin/iptables -t nat -D POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $ip
+ExecStop=/sbin/iptables -t nat -D POSTROUTING -s $vipm ! -d $vipm -j SNAT --to $ip
 ExecStop=/sbin/iptables -D INPUT -p $protocol --dport $port -j ACCEPT
-ExecStop=/sbin/iptables -D FORWARD -s 10.8.0.0/24 -j ACCEPT
+ExecStop=/sbin/iptables -D FORWARD -s $vipm -j ACCEPT
 ExecStop=/sbin/iptables -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
 RemainAfterExit=yes
 [Install]
