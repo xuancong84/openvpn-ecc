@@ -2,7 +2,7 @@
 Openvpn server installation script (derived from https://github.com/Nyr/openvpn-install) using elliptic curve cryptography
 
 
-By default, it uses elliptic curve secp521r1, you can change that by modifying EasyRSA-v3.0.6/vars and rebuilt the archive easyrsa.tgz
+By default, it uses elliptic curve ED25519, you can change that by modifying EASYRSA\_ALGO and EASYRSA\_CURVE in openvpn-install.sh and re-run it.
 
 For most office uses, you do not want to route other traffics via VPN server, such as surfing the web. Thus, a new option (Option 0) is added to avoid redirecting gateway.
 
