@@ -17,6 +17,7 @@ Git clone the repository, and run openvpn-install.sh inside the directory.
 If you need the server to support redirect gateway, you need to do 2 extra things:
 1. Set `net.ipv4.ip_forward=1` in `/etc/sysctl.conf`, and reload it (i.e., `sysctl --system`)
 2. Allow forwarding in IP table rules, i.e., either `iptables -P FORWARD ACCEPT` or `iptables -A FORWARD -s <your-VPN-intranet, e.g., 10.8.0.0>/24 -j ACCEPT` (preferred for security)
+3. (If the above 2 is still not enough) Add iptables NAT rule, `iptables -t nat -A POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to-source <192.168.1.6:VPN-server-LAN-IP>` (change 10.8.0.0 to your VPN Intranet address)
 
 # Client Installation
 For command-line installation, after "apt-get install openvpn", run "openvpn --config client.ovpn"
