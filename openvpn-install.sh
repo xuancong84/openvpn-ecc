@@ -306,6 +306,7 @@ server $vip 255.255.255.0" > /etc/openvpn/server/server.conf
 	fi
 
 	echo 'ifconfig-pool-persist ipp.txt' >> /etc/openvpn/server/server.conf
+	echo 'client-to-client' >> /etc/openvpn/server/server.conf
 	# DNS
 	case "$dns" in
 		0)
