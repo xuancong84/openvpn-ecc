@@ -233,7 +233,7 @@ if [[ ! -e /etc/openvpn/server/server.conf ]]; then
 LimitNPROC=infinity" > /etc/systemd/system/openvpn-server@server.service.d/disable-limitnproc.conf
 	fi
 	if [[ "$os" = "debian" || "$os" = "ubuntu" ]]; then
-		apt-get install -y openvpn openssl ca-certificates $firewall
+		apt-get install openvpn openssl ca-certificates $firewall
 	elif [[ "$os" = "centos" ]]; then
 		yum install -y epel-release
 		yum install -y openvpn openssl ca-certificates tar $firewall
@@ -246,9 +246,9 @@ LimitNPROC=infinity" > /etc/systemd/system/openvpn-server@server.service.d/disab
 		systemctl enable --now firewalld.service
 	fi
 	# Get easy-rsa
-	easy_rsa_url='https://github.com/OpenVPN/easy-rsa/releases/download/v3.1.0/EasyRSA-3.1.0.tgz'
+	easy_rsa_url='https://github.com/OpenVPN/easy-rsa/releases/download/v3.2.2/EasyRSA-3.2.2.tgz'
 	mkdir -p /etc/openvpn/server/easy-rsa/
-	if ! tar xzf $INITPATH/EasyRSA-3.1.0.tgz -C /etc/openvpn/server/easy-rsa/ --strip-components 1; then
+	if ! tar xzf $INITPATH/EasyRSA-3.2.2.tgz -C /etc/openvpn/server/easy-rsa/ --strip-components 1; then
 		{ wget -qO- "$easy_rsa_url" 2>/dev/null || curl -sL "$easy_rsa_url" ; } | tar xz -C /etc/openvpn/server/easy-rsa/ --strip-components 1
 	fi
 	chown -R root:root /etc/openvpn/server/easy-rsa/
@@ -256,11 +256,11 @@ LimitNPROC=infinity" > /etc/systemd/system/openvpn-server@server.service.d/disab
 	# Create the PKI, set up the CA and the server and client certificates
 	./easyrsa init-pki
 	./easyrsa --batch build-ca nopass
-	export EASYRSA_ALGO=ed
-	export EASYRSA_CURVE=ed25519
-	EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-server-full server nopass
-	EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-client-full "$client" nopass
-	EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl
+	export EASYRSA_ALGO=ec
+	export EASYRSA_CURVE=secp521r1
+	EASYRSA_CERT_EXPIRE=7300 ./easyrsa build-server-full server nopass
+	EASYRSA_CERT_EXPIRE=7300 ./easyrsa build-client-full "$client" nopass
+	EASYRSA_CRL_DAYS=7300 ./easyrsa gen-crl
 	# Move the stuff we need
 	cp pki/ca.crt pki/private/ca.key pki/issued/server.crt pki/private/server.key pki/crl.pem /etc/openvpn/server
 	# CRL is read with each client connection, while OpenVPN is dropped to nobody
@@ -349,7 +349,7 @@ server $vip 255.255.255.0" > /etc/openvpn/server/server.conf
 		;;
 	esac
 	echo "keepalive 10 120
-cipher AES-256-CBC
+cipher AES-256-GCM
 user nobody
 group $group_name
 persist-key
@@ -449,7 +449,7 @@ persist-key
 persist-tun
 remote-cert-tls server
 auth SHA512
-cipher AES-256-CBC
+cipher AES-256-GCM
 ignore-unknown-option block-outside-dns
 block-outside-dns
 verb 3
@@ -472,9 +472,10 @@ else
 	echo "   1) Add a new client"
 	echo "   2) Revoke an existing client"
 	echo "   3) Remove OpenVPN"
-	echo "   4) Exit"
+	echo "   4) Regenerate OpenVPN keys"
+	echo "   5) Exit"
 	read -p "Option: " option
-	until [[ "$option" =~ ^[1-4]$ ]]; do
+	until [[ "$option" =~ ^[1-5]$ ]]; do
 		echo "$option: invalid selection."
 		read -p "Option: " option
 	done
@@ -584,12 +585,16 @@ else
 				echo
 				echo "OpenVPN removed!"
 			else
-				echo
 				echo "OpenVPN removal aborted!"
 			fi
 			exit
 		;;
 		4)
+			echo "You can delete /etc/openvpn/server/server.conf and re-run this script.
+This will invalidate all client profiles and re-generate all server certificates and keys."
+			exit
+		;;
+		5)
 			exit
 		;;
 	esac
