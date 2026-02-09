@@ -183,6 +183,7 @@ if [[ ! -e /etc/openvpn/server/server.conf ]]; then
 	done
 	[[ -z "$vipm" ]] && vipm="10.8.0.0/24"
 	vip=`echo $vipm | sed "s:/.*::g"`
+	sip=`echo $vipm | sed "s:0/.*:1:g"`
 	echo
 	echo "What port should OpenVPN listen to?"
 	read -p "Port [1194]: " port
@@ -282,6 +283,7 @@ ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==
 	echo "local $ip
 port $port
 proto $protocol
+dev-type tun
 dev tun
 ca ca.crt
 cert server.crt
@@ -293,17 +295,18 @@ topology subnet
 server $vip 255.255.255.0" > /etc/openvpn/server/server.conf
 	mute=
 	if [[ "$dns" =~ ^- ]]; then
-		client_options='route-nopull'
+		client_options='pull-filter ignore "redirect-gateway"'
 		mute='#'
 		dns=${dns:1}
 	else
-		client_options='#route-nopull'
+		client_options='#pull-filter ignore "redirect-gateway"'
 	fi
 	if [ "$dns" == 0 ]; then
 		echo 'push "#redirect-gateway def1 bypass-dhcp"' >> /etc/openvpn/server/server.conf
 	else
 		echo 'push "redirect-gateway def1 bypass-dhcp"' >> /etc/openvpn/server/server.conf
 	fi
+	echo "push \"route-gateway $sip\"" >> /etc/openvpn/server/server.conf
 
 	echo 'ifconfig-pool-persist ipp.txt' >> /etc/openvpn/server/server.conf
 	echo 'client-to-client' >> /etc/openvpn/server/server.conf
