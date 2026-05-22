@@ -493,8 +493,13 @@ else
 				read -p "Name: " unsanitized_client
 				client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_.-]/_/g' <<< "$unsanitized_client")
 			done
+            read -p "Protect this client with a password? [y/N]: " use_password
+            nopass=nopass
+            if [[ "$use_password" =~ ^[yY]$ ]]; then
+                nopass=
+            fi
 			cd /etc/openvpn/server/easy-rsa/
-			EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-client-full "$client" nopass
+			EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-client-full "$client" $nopass
 			# Generates the custom client.ovpn
 			new_client
 			echo
