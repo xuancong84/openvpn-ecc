@@ -26,6 +26,8 @@ For command-line installation, after "apt-get install openvpn", run "openvpn --c
 
 For GUI installation, install OpenVPN GUI and import profile client.ovpn
 
+For 2FA, please install oathtool, libpam-google-authenticator, and expect
+
 # References:
 - Safety of various elliptic curves, http://safecurves.cr.yp.to/
 - Use elliptic curve cryptography or OpenVPN, https://blog.mirabellette.eu/index.php?article35/a-highly-secure-openvpn-2-4-configuration-2018
